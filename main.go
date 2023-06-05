@@ -44,6 +44,11 @@ func main() {
 	}
 }
 
+func createTask(task *Task) error{
+	_,err := collection.InsertOne(ctx,task)
+	return err
+}
+
 type Task struct{
 	ID primitive.ObjectID `bson:"_id"`
 	CreatedAt time.Time `bson:"created_at"`
