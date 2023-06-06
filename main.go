@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"time"
 	"fmt"
 	"log"
 	"os"
-    
+	"time"
+
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -38,6 +38,18 @@ func main() {
 	app := &cli.App{
 		Name: "tasker",
 		Usage: "A simple todo list manager",
+		Action: func(c *cli.Context) error {
+			tasks,err := getPending()
+			if err != nil {
+				if err == mongo.ErrNoDocuments{
+					fmt.Print("Nothing to see here. \nRun `add 'task'` to add a task")
+					return nil
+				}
+				return err
+			}
+			printTasks(tasks)
+			return nil
+		},
 		Commands: []*cli.Command{
 			{
 				Name: "add",
@@ -155,6 +167,13 @@ func completeTask(text string) error {
 
 	t := &Task{}
 	return collection.FindOneAndUpdate(ctx,filter,update).Decode(t)
+}
+
+func getPending() ([]*Task,error) {
+	filter := bson.D{
+		primitive.E{Key: "completed", Value: false},
+	}
+	return filterTasks(filter)
 }
 
 type Task struct{
