@@ -58,7 +58,33 @@ func main() {
 					return createTask(task)
 				},
 			},
-			
+			{
+				Name: "all",
+				Aliases: []string{"l"},
+				Usage: "list all tasks",
+				Action: func(c *cli.Context) error {
+					tasks, err := getAll()
+					if err != nil {
+						if err == mongo.ErrNoDocuments{
+							fmt.Print("Nothing to see here.\nRun `add 'task'` to add a task")
+							return nil
+						}
+						return err
+					}
+
+					printTasks(tasks)
+					return nil
+				},
+			},
+			{
+				Name: "done",
+				Aliases: []string{"d"},
+				Usage: "complete a task on the list",
+				Action: func(c *cli.Context) error{
+					text := c.Args().First()
+					return completeTask(text)
+				},
+			},
 		},
 	}
 
@@ -119,6 +145,16 @@ func filterTasks(filter interface{}) ([]*Task,error) {
 		return tasks, mongo.ErrNoDocuments
 	}
 	return tasks,nil
+}
+
+func completeTask(text string) error {
+	filter := bson.D{primitive.E{Key: "text", Value: text}}
+	update := bson.D{primitive.E{Key: "$set", Value: bson.D{
+		primitive.E{Key: "completed", Value: true},
+	}}}
+
+	t := &Task{}
+	return collection.FindOneAndUpdate(ctx,filter,update).Decode(t)
 }
 
 type Task struct{
