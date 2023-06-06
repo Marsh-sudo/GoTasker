@@ -17,7 +17,7 @@ import (
 )
 
 var collection *mongo.Collection
-var ctx = context.TODO()
+var ctx = context.TODO() // indicate that you’re not sure what context to use right now, but you plan to add one in the future.
 
 func init() {
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
