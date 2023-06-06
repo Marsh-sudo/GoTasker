@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"errors"
-	"time"
 	"fmt"
 	"log"
 	"os"
-    
+	"time"
+
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,7 +17,7 @@ import (
 )
 
 var collection *mongo.Collection
-var ctx = context.TODO()
+var ctx = context.TODO() // indicate that you’re not sure what context to use right now, but you plan to add one in the future.
 
 func init() {
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
@@ -38,6 +38,18 @@ func main() {
 	app := &cli.App{
 		Name: "tasker",
 		Usage: "A simple todo list manager",
+		Action: func(c *cli.Context) error {
+			tasks,err := getPending()
+			if err != nil {
+				if err == mongo.ErrNoDocuments{
+					fmt.Print("Nothing to see here. \nRun `add 'task'` to add a task")
+					return nil
+				}
+				return err
+			}
+			printTasks(tasks)
+			return nil
+		},
 		Commands: []*cli.Command{
 			{
 				Name: "add",
@@ -83,6 +95,35 @@ func main() {
 				Action: func(c *cli.Context) error{
 					text := c.Args().First()
 					return completeTask(text)
+				},
+			},
+			{
+				Name: "finished",
+				Aliases: []string{"f"},
+				Usage: "list completed tasks",
+				Action: func(c *cli.Context) error {
+					tasks, err := getFinished()
+					if err != nil {
+						if err == mongo.ErrNoDocuments{
+							fmt.Print("Nothing to see here.\nRun `add 'task'` to add a task")
+							return nil
+						}
+						return err
+					}
+					printTasks(tasks)
+					return nil
+				},
+			},
+			{
+				Name: "rm",
+				Usage: "delete a task on the list",
+				Action: func(c *cli.Context) error {
+					text := c.Args().First()
+					err := deleteTask(text)
+					if err != nil {
+						return err
+					}
+					return nil
 				},
 			},
 		},
@@ -157,6 +198,13 @@ func completeTask(text string) error {
 	return collection.FindOneAndUpdate(ctx,filter,update).Decode(t)
 }
 
+func getPending() ([]*Task,error) {
+	filter := bson.D{
+		primitive.E{Key: "completed", Value: false},
+	}
+	return filterTasks(filter)
+}
+
 type Task struct{
 	ID primitive.ObjectID `bson:"_id"`
 	CreatedAt time.Time `bson:"created_at"`
@@ -164,4 +212,24 @@ type Task struct{
 	Text string `bson:"text"`
 	Completed bool `bson:"completed"`
 
+}
+
+func getFinished() ([]*Task,error) {
+	filter := bson.D{
+		primitive.E{Key: "completed", Value: true},
+	}
+	return filterTasks(filter)
+}
+
+func deleteTask(text string) error{
+	filter := bson.D{primitive.E{Key: "text", Value: text}}
+
+	res, err := collection.DeleteOne(ctx,filter)
+	if err != nil {
+		return err
+	}
+	if res.DeletedCount == 0 {
+		return errors.New("No tasks were deleted")
+	}
+	return nil
 }
